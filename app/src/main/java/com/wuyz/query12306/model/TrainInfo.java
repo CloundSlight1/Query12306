@@ -503,16 +503,32 @@ public class TrainInfo {
     
     @Override
     public String toString() {
-        return String.format("%s %s %s(%s)-%s, %s-%s, 二等座(%s), 无座(%s)",
-                station_train_code,
-                start_train_date,
-                from_station_name,
-                start_station_name,
-                to_station_name,
-                start_time,
-                arrive_time,
-                ze_num,
-                wz_num);
+        if (start_station_name.equals(from_station_name)) {
+            return String.format("%s %s %s-%s, %s-%s, 历时(%s), 一等座(%s), 二等座(%s), 无座(%s)",
+                    station_train_code,
+                    start_train_date,
+                    start_station_name,
+                    to_station_name,
+                    start_time,
+                    arrive_time,
+                    lishi,
+                    zy_num,
+                    ze_num,
+                    wz_num);
+        } else {
+            return String.format("%s %s %s(%s)-%s, %s-%s, 历时(%s), 一等座(%s), 二等座(%s), 无座(%s)",
+                    station_train_code,
+                    start_train_date,
+                    from_station_name,
+                    start_station_name,
+                    to_station_name,
+                    start_time,
+                    arrive_time,
+                    lishi,
+                    zy_num,
+                    ze_num,
+                    wz_num);
+        }
     }
 
     @Override
@@ -524,6 +540,14 @@ public class TrainInfo {
         }
         
         return super.equals(obj);
+    }
+
+    public boolean isMatch() {
+        if ("Y".equalsIgnoreCase(canWebBuy)) {
+            if (!isSellOut(zy_num) || !isSellOut(ze_num) || !isSellOut(wz_num))
+                return true;
+        }
+        return false;
     }
 }
 

@@ -1,14 +1,15 @@
 package com.wuyz.query12306;
 
+import android.content.Context;
+
 import com.google.gson.Gson;
 import com.wuyz.query12306.model.JsonMsg4LeftTicket;
 import com.wuyz.query12306.model.TrainInfo;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.FileReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
@@ -47,8 +48,8 @@ public class Utils {
             "1DH+TP3879N5zFoWDgejQ5iFsAh0\n" +
             "-----END CERTIFICATE-----\n";
 
-    private static Map<String, String> readStations(String path) {
-        try (BufferedReader reader = new BufferedReader(new FileReader("station_name.txt"))){
+    public static Map<String, String> readStations(Context context) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(context.getAssets().open("station_name.txt")))){
             Map<String, String> stationMap = new HashMap<>(2500);
             String line;
             while ((line = reader.readLine()) != null) {
@@ -104,11 +105,10 @@ public class Utils {
                 Map<String, List<String>> headers = connection.getHeaderFields();
                 if (headers != null) {
                     for (String key : headers.keySet()) {
-                        System.out.print(key + ":");
+                        Log2.d(TAG, key + ":");
                         for (String v : headers.get(key)) {
-                            System.out.print(v + ",");
+                            Log2.d(TAG, v + ",");
                         }
-                        System.out.println();
                     }
                 }
                 inputStream = connection.getInputStream();
@@ -120,7 +120,7 @@ public class Utils {
                 byteArrayOutputStream.write(buffer, 0, n);
             }
             String content = byteArrayOutputStream.toString();
-            System.out.println(content);
+//            Log2.d(TAG, content);
             return content;
         } catch (Exception e) {
             e.printStackTrace();
@@ -131,18 +131,18 @@ public class Utils {
         return null;
     }
 
-    public static void initHttps() throws Exception {
-        SSLContext context = SSLContext.getInstance("TLS");
+    public static void initHttps(Context context) throws Exception {
+        SSLContext sslContext = SSLContext.getInstance("TLS");
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         keyStore.load(null);
         Certificate certificate = CertificateFactory.getInstance("X.509")
-                .generateCertificate(new ByteArrayInputStream(RFC.getBytes()));
+                .generateCertificate(context.getAssets().open("kyfw.12306.cn.crt"));
         keyStore.setCertificateEntry("SRCA", certificate);
         TrustManagerFactory factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         factory.init(keyStore);
-        context.init(null, factory.getTrustManagers(), null);
+        sslContext.init(null, factory.getTrustManagers(), null);
 //        context.init(null, new TrustManager[]{new EmptyTrustManager()}, null);
-        HttpsURLConnection.setDefaultSSLSocketFactory(context.getSocketFactory());
+        HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
     }
 
     private static class EmptyTrustManager implements X509TrustManager {
@@ -170,36 +170,15 @@ public class Utils {
         JsonMsg4LeftTicket ticket = gson.fromJson(content, JsonMsg4LeftTicket.class);
         if (ticket == null)
             return null;
+//        Log2.d(TAG, "parseAvailableTrains: %s", content);
         List<JsonMsg4LeftTicket.TrainQueryInfo> infos = ticket.getData();
         if (infos == null || infos.isEmpty())
             return null;
         List<TrainInfo> list = new ArrayList<>(4);
         for (JsonMsg4LeftTicket.TrainQueryInfo info : infos) {
             TrainInfo trainInfo = info.getQueryLeftNewDTO();
-            if (trainInfo != null && "Y".equalsIgnoreCase(trainInfo.getCanWebBuy())) {
-                String s = trainInfo.getZe_num();
-                try {
-                    if ("有".equals(s)) {
-                        list.add(trainInfo);
-                        continue;
-                    }
-                    Integer.parseInt(s);
-                    list.add(trainInfo);
-                    continue;
-                } catch (Exception e) {
-                }
-
-                s = trainInfo.getWz_num();
-                try {
-                    if ("有".equals(s)) {
-                        list.add(trainInfo);
-                        continue;
-                    }
-                    Integer.parseInt(s);
-                    list.add(trainInfo);
-                    continue;
-                } catch (Exception e) {
-                }
+            if (trainInfo != null && trainInfo.isMatch()) {
+                list.add(trainInfo);
             }
         }
         return list;
