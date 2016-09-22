@@ -7,7 +7,8 @@
         android:layout_width="80dp"
         android:layout_height="wrap_content"
         android:text="D3106"
-        android:layout_marginTop="10dp"/>
+        android:layout_marginTop="10dp"
+        android:textSize="20sp"/>
     <TextView
         android:id="@+id/from_station"
         android:layout_width="80dp"

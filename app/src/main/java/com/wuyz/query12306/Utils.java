@@ -1,6 +1,8 @@
 package com.wuyz.query12306;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 
 import com.google.gson.Gson;
 import com.wuyz.query12306.model.JsonMsg4LeftTicket;
@@ -16,9 +18,11 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -29,6 +33,10 @@ import javax.net.ssl.X509TrustManager;
 
 public class Utils {
     private static final String TAG = "Utils";
+
+    public static SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+    public static SimpleDateFormat dateFormat2 = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+    public static SimpleDateFormat dateFormat3 = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
     private static final String RFC = "-----BEGIN CERTIFICATE-----\n" +
             "MIICsTCCAhqgAwIBAgIIODtw6bZEH1kwDQYJKoZIhvcNAQEFBQAwRzELMAkGA1UE\n" +
@@ -48,27 +56,29 @@ public class Utils {
             "1DH+TP3879N5zFoWDgejQ5iFsAh0\n" +
             "-----END CERTIFICATE-----\n";
 
-    public static Map<String, String> readStations(Context context) {
+    public static void readStations(Context context, Map<String, String> stationMap, List<String> sortedKeys) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(context.getAssets().open("station_name.txt")))){
-            Map<String, String> stationMap = new HashMap<>(2500);
+            stationMap.clear();
+            sortedKeys.clear();
             String line;
             while ((line = reader.readLine()) != null) {
                 if (!line.isEmpty()) {
                     String[] arr = line.split("\\|");
                     if (arr.length >= 2) {
-                        stationMap.put(arr[1].trim(), arr[2].trim());
+                        String key = arr[1].trim();
+                        stationMap.put(key, arr[2].trim());
+                        sortedKeys.add(key);
                     }
                 }
             }
-            return stationMap;
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return null;
     }
 
     //queryLeftTickets("XKS", "ARH", "2016-10-01");
     public static String queryLeftTickets(String fromStationCode, String toStationCode, String date) {
+        Log2.d(TAG, "queryLeftTickets %s %s %s", fromStationCode, toStationCode, date);
         HttpsURLConnection connection = null;
         try {
             String param = String.format("leftTicketDTO.train_date=%s" +
@@ -163,7 +173,7 @@ public class Utils {
         }
     }
 
-    public static List<TrainInfo> parseAvailableTrains(String content) {
+    public static List<TrainInfo> parseAvailableTrains(String content, boolean firstSeat, boolean secondSeat, boolean noSeat) {
         if (content == null || content.isEmpty())
             return null;
         Gson gson = new Gson();
@@ -177,10 +187,20 @@ public class Utils {
         List<TrainInfo> list = new ArrayList<>(4);
         for (JsonMsg4LeftTicket.TrainQueryInfo info : infos) {
             TrainInfo trainInfo = info.getQueryLeftNewDTO();
-            if (trainInfo != null && trainInfo.isMatch()) {
+            if (trainInfo != null && trainInfo.isMatch(firstSeat, secondSeat, noSeat)) {
                 list.add(trainInfo);
             }
         }
         return list;
+    }
+
+    public static String formatTime(Date time) {
+        return dateFormat.format(time);
+    }
+
+    public static boolean isNetworkConnected(Context context) {
+        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = connectivityManager.getActiveNetworkInfo();
+        return info != null && info.isConnected();
     }
 }

@@ -542,9 +542,13 @@ public class TrainInfo {
         return super.equals(obj);
     }
 
-    public boolean isMatch() {
+    public boolean isMatch(boolean firstSeat, boolean secondSeat, boolean noSeat) {
         if ("Y".equalsIgnoreCase(canWebBuy)) {
-            if (!isSellOut(zy_num) || !isSellOut(ze_num) || !isSellOut(wz_num))
+            if (firstSeat && !isSellOut(zy_num))
+                return true;
+            if (secondSeat && !isSellOut(ze_num))
+                return true;
+            if (noSeat && !isSellOut(wz_num))
                 return true;
         }
         return false;
