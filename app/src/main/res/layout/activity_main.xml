@@ -8,40 +8,71 @@
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
-    tools:context="com.wuyz.query12306.MainActivity">
+    tools:context="com.wuyz.query12306.MainActivity"
+    android:focusableInTouchMode="true">
+    <AutoCompleteTextView
+        android:id="@+id/start_station_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="出发站"
+        android:completionThreshold="1"
+        android:maxLines="1"
+        android:layout_marginEnd="120dp"/>
+    <AutoCompleteTextView
+        android:id="@+id/end_station_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/start_station_view"
+        android:hint="到达站"
+        android:completionThreshold="1"
+        android:maxLines="1"
+        android:layout_marginEnd="120dp"/>
+    <Button
+        android:id="@+id/exchange_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:text="交换"
+        android:layout_alignTop="@id/start_station_view"
+        android:layout_alignBottom="@id/end_station_view"/>
     <TextView
-        android:id="@+id/start_station_text"
+        android:id="@+id/start_date_hint"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="出发站"/>
-    <Spinner
-        android:id="@+id/start_station_spinner"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/start_station_text"
-        android:fadeScrollbars="true"/>
-    <Spinner
-        android:id="@+id/end_station_spinner"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_toEndOf="@id/start_station_spinner"
-        android:layout_alignTop="@id/start_station_spinner"
-        android:fadeScrollbars="true"/>
+        android:text="日期范围"
+        android:layout_below="@id/end_station_view"
+        android:layout_marginTop="16dp"/>
     <TextView
-        android:id="@+id/end_station_text"
+        android:id="@+id/start_date_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="到达站"
-        android:layout_alignStart="@id/end_station_spinner"/>
+        android:layout_toEndOf="@id/start_date_hint"
+        android:layout_alignBaseline="@id/start_date_hint"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:textSize="20sp"
+        android:text="2016-10-01"
+        android:layout_marginStart="16dp"/>
+    <TextView
+        android:id="@+id/end_date_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/start_date_view"
+        android:layout_alignBaseline="@id/start_date_view"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:textSize="20sp"
+        android:text="2016-10-01"
+        android:layout_marginStart="16dp"/>
     <TextView
         android:id="@+id/start_time_hint"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="开始时间"
-        android:layout_below="@id/start_station_spinner"
-        android:layout_marginTop="16dp"/>
+        android:text="出发时间范围"
+        android:layout_below="@id/start_date_hint"
+        android:layout_marginTop="24dp"/>
     <TextView
-        android:id="@+id/start_date_view"
+        android:id="@+id/start_time_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_toEndOf="@id/start_time_hint"
@@ -49,60 +80,31 @@
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
         android:textSize="20sp"
-        android:text="2016-10-01"
-        android:layout_marginStart="16dp"/>
-    <TextView
-        android:id="@+id/start_time_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_toEndOf="@id/start_date_view"
-        android:layout_alignBaseline="@id/start_time_hint"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
-        android:textSize="20sp"
         android:text="11:46"
-        android:layout_marginStart="16dp"/>
-    <TextView
-        android:id="@+id/end_time_hint"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="结束时间"
-        android:layout_below="@id/start_time_hint"
-        android:layout_marginTop="24dp"/>
-    <TextView
-        android:id="@+id/end_date_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_toEndOf="@id/end_time_hint"
-        android:layout_alignBaseline="@id/end_time_hint"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
-        android:textSize="20sp"
-        android:text="2016-10-01"
         android:layout_marginStart="16dp"/>
     <TextView
         android:id="@+id/end_time_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_toEndOf="@id/end_date_view"
-        android:layout_alignBaseline="@id/end_time_hint"
+        android:layout_toEndOf="@id/start_time_view"
+        android:layout_alignBaseline="@id/start_time_view"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
         android:textSize="20sp"
         android:text="11:46"
-        android:layout_marginStart="16dp"/>
+        android:layout_marginStart="24dp"/>
     <CheckBox
         android:id="@+id/first_seat_check"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="一等座"
-        android:layout_below="@id/end_time_hint"/>
+        android:layout_below="@id/start_time_hint"/>
     <CheckBox
         android:id="@+id/second_seat_check"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="二等座"
-        android:layout_below="@id/end_time_hint"
+        android:layout_below="@id/start_time_hint"
         android:layout_toEndOf="@id/first_seat_check"
         android:checked="true"/>
     <CheckBox
@@ -110,20 +112,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="无座"
-        android:layout_below="@id/end_time_hint"
+        android:layout_below="@id/start_time_hint"
         android:layout_toEndOf="@id/second_seat_check"/>
-    <Spinner
-        android:id="@+id/timer_spinner"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignTop="@id/end_station_spinner"
-        android:layout_toEndOf="@id/end_station_spinner"/>
-    <TextView
-        android:id="@+id/timer_text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="定时间隔"
-        android:layout_alignStart="@id/timer_spinner"/>
     <Button
         android:id="@+id/query_button"
         android:layout_width="wrap_content"
@@ -137,6 +127,12 @@
         android:text="定时查询"
         android:layout_toEndOf="@id/query_button"
         android:layout_below="@id/first_seat_check"/>
+    <Spinner
+        android:id="@+id/timer_spinner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/timer_query_button"
+        android:layout_alignBaseline="@id/timer_query_button"/>
     <ListView
         android:id="@+id/list1"
         android:layout_width="match_parent"

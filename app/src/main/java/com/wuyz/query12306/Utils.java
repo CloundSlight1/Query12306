@@ -20,7 +20,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -34,9 +34,9 @@ import javax.net.ssl.X509TrustManager;
 public class Utils {
     private static final String TAG = "Utils";
 
-    public static SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
-    public static SimpleDateFormat dateFormat2 = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-    public static SimpleDateFormat dateFormat3 = new SimpleDateFormat("HH:mm", Locale.getDefault());
+    public static SimpleDateFormat dateLongFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+    public static SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+    public static SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
     private static final String RFC = "-----BEGIN CERTIFICATE-----\n" +
             "MIICsTCCAhqgAwIBAgIIODtw6bZEH1kwDQYJKoZIhvcNAQEFBQAwRzELMAkGA1UE\n" +
@@ -74,6 +74,25 @@ public class Utils {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static Map<String, String> readStations(Context context) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(context.getAssets().open("station_name.txt")))){
+            Map<String, String> result = new HashMap<>(2500);
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.isEmpty()) {
+                    String[] arr = line.split("\\|");
+                    if (arr.length > 2) {
+                        result.put(arr[1].trim(), arr[2].trim());
+                    }
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new HashMap<>(0);
     }
 
     //queryLeftTickets("XKS", "ARH", "2016-10-01");
@@ -114,12 +133,15 @@ public class Utils {
             } else {
                 Map<String, List<String>> headers = connection.getHeaderFields();
                 if (headers != null) {
+                    StringBuilder builder = new StringBuilder();
                     for (String key : headers.keySet()) {
-                        Log2.d(TAG, key + ":");
+                        builder.append(key).append(':');
                         for (String v : headers.get(key)) {
-                            Log2.d(TAG, v + ",");
+                            builder.append(v).append(',');
                         }
+                        builder.append('\n');
                     }
+                    Log2.d(TAG, "headers\n%s", builder);
                 }
                 inputStream = connection.getInputStream();
             }
@@ -130,10 +152,10 @@ public class Utils {
                 byteArrayOutputStream.write(buffer, 0, n);
             }
             String content = byteArrayOutputStream.toString();
-//            Log2.d(TAG, content);
+//            Log2.d(TAG, "%s", content);
             return content;
         } catch (Exception e) {
-            e.printStackTrace();
+            Log2.e(TAG, e);
         } finally {
             if (connection != null)
                 connection.disconnect();
@@ -173,9 +195,11 @@ public class Utils {
         }
     }
 
-    public static List<TrainInfo> parseAvailableTrains(String content, boolean firstSeat, boolean secondSeat, boolean noSeat) {
-        if (content == null || content.isEmpty())
+    public static List<TrainInfo> parseAvailableTrains(String content, boolean firstSeat,
+                                                       boolean secondSeat, boolean noSeat, String time1, String time2) {
+        if (content == null || content.isEmpty()) {
             return null;
+        }
         Gson gson = new Gson();
         JsonMsg4LeftTicket ticket = gson.fromJson(content, JsonMsg4LeftTicket.class);
         if (ticket == null)
@@ -187,15 +211,11 @@ public class Utils {
         List<TrainInfo> list = new ArrayList<>(4);
         for (JsonMsg4LeftTicket.TrainQueryInfo info : infos) {
             TrainInfo trainInfo = info.getQueryLeftNewDTO();
-            if (trainInfo != null && trainInfo.isMatch(firstSeat, secondSeat, noSeat)) {
+            if (trainInfo != null && trainInfo.isMatch(firstSeat, secondSeat, noSeat, time1, time2)) {
                 list.add(trainInfo);
             }
         }
         return list;
-    }
-
-    public static String formatTime(Date time) {
-        return dateFormat.format(time);
     }
 
     public static boolean isNetworkConnected(Context context) {

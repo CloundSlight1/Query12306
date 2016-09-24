@@ -3,6 +3,8 @@ package com.wuyz.query12306;
 import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.DatePickerDialog;
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.TimePickerDialog;
 import android.content.BroadcastReceiver;
@@ -11,6 +13,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.speech.tts.TextToSpeech;
@@ -18,6 +21,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -30,12 +34,12 @@ import android.widget.Toast;
 
 import com.wuyz.query12306.model.TrainInfo;
 
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class MainActivity extends Activity implements View.OnClickListener, TextToSpeech.OnInitListener {
     private static final String TAG = "MainActivity";
@@ -43,9 +47,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
 
     private Button queryButton;
     private Button timerQueryButton;
-    private ListView listView;
-    private Spinner startStationSpinner;
-    private Spinner endStationSpinner;
+    private Button exchangeButton;
+    private AutoCompleteTextView startStationView;
+    private AutoCompleteTextView endStationView;
     private Spinner timerSpinner;
     private TextView startDateText;
     private TextView startTimeText;
@@ -56,21 +60,30 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     private CheckBox noSeatCheck;
 
     private List<TrainInfo> data = new ArrayList<>();
-    private Map<String, String> stationMap = new HashMap<>(2500);
-    private List<String> stationNames = new ArrayList<>(stationMap.size());
+    private Map<String, String> stationMap;
+//    private List<StationInfo> stations;
     private MyAdapter adapter;
     private SharedPreferences preferences;
-    private Calendar startTime;
-    private Calendar endTime;
-    private ArrayAdapter<String> startStationAdapter;
-    private ArrayAdapter<String> endStationAdapter;
+    private Calendar startDate = Calendar.getInstance();
+    private Calendar endDate = Calendar.getInstance();
+    private Calendar startTime = Calendar.getInstance();
+    private Calendar endTime = Calendar.getInstance();
     private String[] timerKeys = new String[] {"5秒", "30秒", "1分钟", "10分钟", "30分钟", "60分钟"};
     private int[] timerValues = new int[] {5, 30, 60, 600, 1800, 3600};
     private AlarmManager alarmManager;
     private boolean isInTimerQuery = false;
     private PendingIntent pendingIntent;
     private Vibrator vibrator;
-    private TextToSpeech textToSpeech;
+    private String startCode;
+    private String endCode;
+
+    private Handler handler = new Handler();
+    private Runnable runnable = new Runnable() {
+        @Override
+        public void run() {
+            tryQueryTicket();
+        }
+    };
 
     private BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
@@ -89,9 +102,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         pendingIntent = PendingIntent.getBroadcast(MainActivity.this, 0,
                 new Intent(ACTION_QUERY), PendingIntent.FLAG_UPDATE_CURRENT);
         vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
-        textToSpeech = new TextToSpeech(this, this);
 
-        Utils.readStations(this, stationMap, stationNames);
+        stationMap = Utils.readStations(this);
         initViews();
         restorePrefs();
         registerReceiver(receiver, new IntentFilter(ACTION_QUERY));
@@ -100,8 +112,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     private void initViews() {
         queryButton = (Button) findViewById(R.id.query_button);
         timerQueryButton = (Button) findViewById(R.id.timer_query_button);
-        startStationSpinner = (Spinner) findViewById(R.id.start_station_spinner);
-        endStationSpinner = (Spinner) findViewById(R.id.end_station_spinner);
+        startStationView = (AutoCompleteTextView) findViewById(R.id.start_station_view);
+        endStationView = (AutoCompleteTextView) findViewById(R.id.end_station_view);
         timerSpinner = (Spinner) findViewById(R.id.timer_spinner);
         startDateText = (TextView) findViewById(R.id.start_date_view);
         endDateText = (TextView) findViewById(R.id.end_date_view);
@@ -110,6 +122,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         firstSeatCheck = (CheckBox) findViewById(R.id.first_seat_check);
         secondSeatCheck = (CheckBox) findViewById(R.id.second_seat_check);
         noSeatCheck = (CheckBox) findViewById(R.id.no_seat_check);
+        exchangeButton = (Button) findViewById(R.id.exchange_button);
 
         queryButton.setOnClickListener(this);
         timerQueryButton.setOnClickListener(this);
@@ -117,32 +130,33 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         endDateText.setOnClickListener(this);
         startTimeText.setOnClickListener(this);
         endTimeText.setOnClickListener(this);
+        exchangeButton.setOnClickListener(this);
 
-        listView = (ListView) findViewById(R.id.list1);
+        ListView listView = (ListView) findViewById(R.id.list1);
         adapter = new MyAdapter();
         listView.setAdapter(adapter);
 
-        startStationAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item,
-                stationNames);
-        startStationSpinner.setAdapter(startStationAdapter);
+        List<String> keys = new ArrayList<>(stationMap.size());
+        Set<String> set = stationMap.keySet();
+        for (String k : set) {
+            keys.add(k);
+        }
+        ArrayAdapter<String> startStationAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line,
+                keys);
+        startStationView.setAdapter(startStationAdapter);
 
-        endStationAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item,
-                stationNames);
-        endStationSpinner.setAdapter(endStationAdapter);
+        ArrayAdapter<String> endStationAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line,
+                keys);
+        endStationView.setAdapter(endStationAdapter);
 
         timerSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, timerKeys));
     }
 
     private void restorePrefs() {
-        int i = preferences.getInt("startStation", 0);
-        if (i  >= 0 && i < stationNames.size()) {
-            startStationSpinner.setSelection(i);
-        }
-        i = preferences.getInt("endStation", 0);
-        if (i  >= 0 && i < stationNames.size()) {
-            endStationSpinner.setSelection(i);
-        }
-        i = preferences.getInt("timer", 0);
+        startStationView.setText(preferences.getString("startStation", ""));
+        endStationView.setText(preferences.getString("endStation", ""));
+
+        int i = preferences.getInt("timer", 0);
         if (i  >= 0 && i < timerSpinner.getAdapter().getCount()) {
             timerSpinner.setSelection(i);
         }
@@ -151,37 +165,57 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         secondSeatCheck.setChecked(preferences.getBoolean("secondSeat", true));
         noSeatCheck.setChecked(preferences.getBoolean("noSeat", false));
 
-        long curTime = System.currentTimeMillis();
-        long time = preferences.getLong("startTime", curTime);
-        time = Math.max(time, curTime);
-        startTime = Calendar.getInstance();
-        startTime.setTime(new Date(time));
-        startDateText.setText(Utils.dateFormat2.format(startTime.getTime()));
-        startTimeText.setText(Utils.dateFormat3.format(startTime.getTime()));
+        String s = preferences.getString("startDate", "");
+        try {
+            startDate.setTime(Utils.dateFormat.parse(s));
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        startDateText.setText(Utils.dateFormat.format(startDate.getTime()));
 
-        time = preferences.getLong("endTime", curTime + 24 * 3600000L);
-        time = Math.max(time, curTime);
-        endTime = Calendar.getInstance();
-        endTime.setTime(new Date(time));
-        endDateText.setText(Utils.dateFormat2.format(endTime.getTime()));
-        endTimeText.setText(Utils.dateFormat3.format(endTime.getTime()));
+        s = preferences.getString("endDate", "");
+        try {
+            endDate.setTime(Utils.dateFormat.parse(s));
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        endDateText.setText(Utils.dateFormat.format(endDate.getTime()));
+
+        s = preferences.getString("startTime", "00:00");
+        try {
+            startTime.setTime(Utils.timeFormat.parse(s));
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        startTimeText.setText(Utils.timeFormat.format(startTime.getTime()));
+
+        s = preferences.getString("endTime", "23:59");
+        try {
+            endTime.setTime(Utils.timeFormat.parse(s));
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        endTimeText.setText(Utils.timeFormat.format(endTime.getTime()));
     }
 
     private void savePrefs() {
         SharedPreferences.Editor editor = preferences.edit();
-        editor.putInt("startStation", startStationSpinner.getSelectedItemPosition());
-        editor.putInt("endStation", endStationSpinner.getSelectedItemPosition());
+        editor.putString("startStation", startStationView.getText().toString());
+        editor.putString("endStation", endStationView.getText().toString());
         editor.putInt("timer", timerSpinner.getSelectedItemPosition());
         editor.putBoolean("firstSeat", firstSeatCheck.isChecked());
         editor.putBoolean("secondSeat", secondSeatCheck.isChecked());
         editor.putBoolean("noSeat", noSeatCheck.isChecked());
-        editor.putLong("startTime", startTime.getTimeInMillis());
-        editor.putLong("endTime", endTime.getTimeInMillis());
+        editor.putString("startDate", Utils.dateFormat.format(startDate.getTime()));
+        editor.putString("endDate", Utils.dateFormat.format(endDate.getTime()));
+        editor.putString("startTime", Utils.timeFormat.format(startTime.getTime()));
+        editor.putString("endTime", Utils.timeFormat.format(endTime.getTime()));
         editor.apply();
     }
 
     @Override
     protected void onDestroy() {
+        handler.removeCallbacksAndMessages(null);
         unregisterReceiver(receiver);
         savePrefs();
         super.onDestroy();
@@ -195,12 +229,20 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                     Toast.makeText(this, "网络未连接，请检查！", Toast.LENGTH_SHORT).show();
                     return;
                 }
+                if (!getStationCode()) {
+                    Toast.makeText(this, "站点有误！", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 queryButton.setEnabled(false);
                 tryQueryTicket();
                 break;
             case R.id.timer_query_button:
                 if (isInTimerQuery) {
                     stopTimer();
+                    return;
+                }
+                if (!getStationCode()) {
+                    Toast.makeText(this, "站点有误！", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 if (!Utils.isNetworkConnected(this)) {
@@ -215,13 +257,14 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                 DatePickerDialog dialog = new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
                     @Override
                     public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
-                        startTime.set(Calendar.YEAR, year);
-                        startTime.set(Calendar.MONTH, month);
-                        startTime.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-                        startTime.set(Calendar.HOUR_OF_DAY, 0);
-                        startDateText.setText(Utils.dateFormat2.format(startTime.getTime()));
+                        startDate.set(Calendar.YEAR, year);
+                        startDate.set(Calendar.MONTH, month);
+                        startDate.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                        startDate.set(Calendar.HOUR_OF_DAY, 0);
+                        startDate.set(Calendar.MINUTE, 0);
+                        startDateText.setText(Utils.dateFormat.format(startDate.getTime()));
                     }
-                }, startTime.get(Calendar.YEAR), startTime.get(Calendar.MONTH), startTime.get(Calendar.DAY_OF_MONTH));
+                }, startDate.get(Calendar.YEAR), startDate.get(Calendar.MONTH), startDate.get(Calendar.DAY_OF_MONTH));
                 dialog.getDatePicker().setMinDate(System.currentTimeMillis() - 24 * 3600000L);
                 dialog.show();
                 break;
@@ -229,13 +272,14 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                 dialog = new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
                     @Override
                     public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
-                        endTime.set(Calendar.YEAR, year);
-                        endTime.set(Calendar.MONTH, month);
-                        endTime.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-                        endDateText.setText(Utils.dateFormat2.format(endTime.getTime()));
-                        endTimeText.setText(Utils.dateFormat3.format(endTime.getTime()));
+                        endDate.set(Calendar.YEAR, year);
+                        endDate.set(Calendar.MONTH, month);
+                        endDate.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                        endDate.set(Calendar.HOUR_OF_DAY, 23);
+                        endDate.set(Calendar.MINUTE, 59);
+                        endDateText.setText(Utils.dateFormat.format(endDate.getTime()));
                     }
-                }, endTime.get(Calendar.YEAR), endTime.get(Calendar.MONTH), endTime.get(Calendar.DAY_OF_MONTH));
+                }, endDate.get(Calendar.YEAR), endDate.get(Calendar.MONTH), endDate.get(Calendar.DAY_OF_MONTH));
                 dialog.getDatePicker().setMinDate(System.currentTimeMillis() - 24 * 3600000L);
                 dialog.show();
                 break;
@@ -245,7 +289,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                     public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
                         startTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
                         startTime.set(Calendar.MINUTE, minute);
-                        startTimeText.setText(Utils.dateFormat3.format(startTime.getTime()));
+                        startTimeText.setText(Utils.timeFormat.format(startTime.getTime()));
                     }
                 }, startTime.get(Calendar.HOUR_OF_DAY), startTime.get(Calendar.MINUTE), true);
                 dialog2.show();
@@ -256,30 +300,60 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                     public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
                         endTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
                         endTime.set(Calendar.MINUTE, minute);
-                        endTimeText.setText(Utils.dateFormat3.format(endTime.getTime()));
+                        endTimeText.setText(Utils.timeFormat.format(endTime.getTime()));
                     }
                 }, endTime.get(Calendar.HOUR_OF_DAY), endTime.get(Calendar.MINUTE), true);
                 dialog2.show();
                 break;
+            case R.id.exchange_button:
+                String s1 = startStationView.getText().toString();
+                String s2 = endStationView.getText().toString();
+                startStationView.setText(s2);
+                endStationView.setText(s1);
+                break;
         }
     }
 
+    private boolean getStationCode() {
+//        startCode = null;
+//        endCode = null;
+        String startName = startStationView.getText().toString();
+        String endName = endStationView.getText().toString();
+//        for (StationInfo info : stations) {
+//            if (startCode == null && info.name.equals(startName)) {
+//                startCode = info.code;
+//            }
+//            if (endCode == null && info.name.equals(endName)) {
+//                endCode = info.code;
+//            }
+//            if (startCode != null && endCode != null)
+//                break;
+//        }
+        startCode = stationMap.get(startName);
+        endCode = stationMap.get(endName);
+        return startCode != null && endCode != null;
+    }
+
     private void tryQueryTicket() {
-        Log2.d(TAG, "tryQueryTicket %s - %s", Utils.dateFormat.format(startTime.getTime()),
-                Utils.dateFormat.format(endTime.getTime()));
+        final String time1 = Utils.timeFormat.format(startTime.getTime());
+        final String time2 = Utils.timeFormat.format(endTime.getTime());
+        Log2.d(TAG, "tryQueryTicket %s - %s, %s - %s",
+                Utils.dateFormat.format(startDate.getTime()),
+                Utils.dateFormat.format(endDate.getTime()),
+                time1, time2);
+
         ThreadExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 data.clear();
                 if (Utils.isNetworkConnected(MainActivity.this)) {
-                    Calendar calendar = (Calendar) startTime.clone();
-                    while (calendar.getTimeInMillis() <= endTime.getTimeInMillis()) {
-                        String content = Utils.queryLeftTickets(
-                                stationMap.get((String) startStationSpinner.getSelectedItem()),
-                                stationMap.get((String) endStationSpinner.getSelectedItem()),
-                                Utils.dateFormat2.format(calendar.getTime()));
+                    Calendar calendar = (Calendar) startDate.clone();
+                    while (calendar.getTimeInMillis() <= endDate.getTimeInMillis()) {
+                        String content = Utils.queryLeftTickets( startCode, endCode,
+                                Utils.dateFormat.format(calendar.getTime()));
                         List<TrainInfo> list = Utils.parseAvailableTrains(content,
-                                firstSeatCheck.isChecked(), secondSeatCheck.isChecked(), noSeatCheck.isChecked());
+                                firstSeatCheck.isChecked(), secondSeatCheck.isChecked(), noSeatCheck.isChecked(),
+                                time1, time2);
                         if (list != null)
                             data.addAll(list);
                         try {
@@ -302,8 +376,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                                 }
 
                                 int dealtTime = timerValues[timerSpinner.getSelectedItemPosition()] * 1000;
-                                alarmManager.cancel(pendingIntent);
-                                alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + dealtTime, pendingIntent);
+                                if (dealtTime < 300000) {
+                                    handler.removeCallbacks(runnable);
+                                    handler.postDelayed(runnable, dealtTime);
+                                } else {
+                                    alarmManager.cancel(pendingIntent);
+                                    alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + dealtTime, pendingIntent);
+                                }
                             } else {
                                 enableViews(true);
                             }
@@ -312,8 +391,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                 } else {
                     if (isInTimerQuery) {
                         int dealtTime = timerValues[timerSpinner.getSelectedItemPosition()] * 1000;
-                        alarmManager.cancel(pendingIntent);
-                        alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + dealtTime, pendingIntent);
+                        if (dealtTime < 300000) {
+                            handler.removeCallbacks(runnable);
+                            handler.postDelayed(runnable, dealtTime);
+                        } else {
+                            alarmManager.cancel(pendingIntent);
+                            alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + dealtTime, pendingIntent);
+                        }
                     }
                 }
             }
@@ -333,16 +417,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     public void onInit(int status) {
         if (status != TextToSpeech.SUCCESS) {
             Log2.e(TAG, "failed to init text to speech");
-            textToSpeech = null;
         }
     }
 
     private static class MyViewHolder {
 
-        public TextView number, date, fromStation, toStation, starTtime, endTime, spendTime, firstSeat, secondSeat, noSeat;
+        TextView number, date, fromStation, toStation, starTtime, endTime, spendTime, firstSeat, secondSeat, noSeat;
 
 
-        public MyViewHolder(View itemView) {
+        MyViewHolder(View itemView) {
             itemView.setTag(this);
             number = (TextView) itemView.findViewById(R.id.number);
             date = (TextView) itemView.findViewById(R.id.date);
@@ -427,8 +510,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     private void enableViews(boolean enable) {
         queryButton.setEnabled(enable);
         timerQueryButton.setText(enable ? "定时查询" : "停止查询");
-        startStationSpinner.setEnabled(enable);
-        endStationSpinner.setEnabled(enable);
+        startStationView.setEnabled(enable);
+        endStationView.setEnabled(enable);
         timerSpinner.setEnabled(enable);
         startDateText.setEnabled(enable);
         startTimeText.setEnabled(enable);
@@ -437,6 +520,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         firstSeatCheck.setEnabled(enable);
         secondSeatCheck.setEnabled(enable);
         noSeatCheck.setEnabled(enable);
+        exchangeButton.setEnabled(enable);
     }
 
     private void stopTimer() {
@@ -447,9 +531,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
 
     private void notifyUser() {
         vibrator.cancel();
-        vibrator.vibrate(new long[] {500, 500}, 4);
-        if (textToSpeech != null) {
-            textToSpeech.speak("find ticket", TextToSpeech.QUEUE_FLUSH, null, null);
-        }
+        vibrator.vibrate(new long[] {100, 200, 100, 200}, 3);
+        Notification.Builder builder = new Notification.Builder(this);
+        builder.setTicker("12306");
+        builder.setContentText("发现火车票");
+        builder.setContentTitle("发现火车票");
+        Notification notification = builder.build();
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        notificationManager.notify(1, notification);
     }
 }

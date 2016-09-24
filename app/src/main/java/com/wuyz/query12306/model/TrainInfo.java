@@ -542,8 +542,8 @@ public class TrainInfo {
         return super.equals(obj);
     }
 
-    public boolean isMatch(boolean firstSeat, boolean secondSeat, boolean noSeat) {
-        if ("Y".equalsIgnoreCase(canWebBuy)) {
+    public boolean isMatch(boolean firstSeat, boolean secondSeat, boolean noSeat, String time1, String time2) {
+        if ("Y".equalsIgnoreCase(canWebBuy) && start_time.compareTo(time1) >= 0 && start_time.compareTo(time2) <= 0) {
             if (firstSeat && !isSellOut(zy_num))
                 return true;
             if (secondSeat && !isSellOut(ze_num))
