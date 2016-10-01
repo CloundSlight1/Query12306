@@ -195,8 +195,7 @@ public class Utils {
         }
     }
 
-    public static List<TrainInfo> parseAvailableTrains(String content, boolean firstSeat,
-                                                       boolean secondSeat, boolean noSeat, String time1, String time2) {
+    public static List<TrainInfo> parseAvailableTrains(String content, String time1, String time2) {
         if (content == null || content.isEmpty()) {
             return null;
         }
@@ -211,7 +210,7 @@ public class Utils {
         List<TrainInfo> list = new ArrayList<>(4);
         for (JsonMsg4LeftTicket.TrainQueryInfo info : infos) {
             TrainInfo trainInfo = info.getQueryLeftNewDTO();
-            if (trainInfo != null && trainInfo.isMatch(firstSeat, secondSeat, noSeat, time1, time2)) {
+            if (trainInfo != null && trainInfo.isMatch(time1, time2)) {
                 list.add(trainInfo);
             }
         }

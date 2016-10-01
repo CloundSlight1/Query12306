@@ -12,6 +12,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Vibrator;
@@ -25,6 +27,7 @@ import android.widget.AutoCompleteTextView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.DatePicker;
 import android.widget.ListView;
 import android.widget.Spinner;
@@ -37,11 +40,13 @@ import com.wuyz.query12306.model.TrainInfo;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class MainActivity extends Activity implements View.OnClickListener, TextToSpeech.OnInitListener {
+public class MainActivity extends Activity implements View.OnClickListener, TextToSpeech.OnInitListener, CompoundButton.OnCheckedChangeListener {
     private static final String TAG = "MainActivity";
     private static final String ACTION_QUERY = "com.wuyz.query12306.ACTION_QUERY";
 
@@ -60,6 +65,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     private CheckBox noSeatCheck;
 
     private List<TrainInfo> data = new ArrayList<>();
+    private List<TrainInfo> filteredData = new ArrayList<>();
     private Map<String, String> stationMap;
 //    private List<StationInfo> stations;
     private MyAdapter adapter;
@@ -82,6 +88,19 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         @Override
         public void run() {
             tryQueryTicket();
+        }
+    };
+
+    private Comparator<TrainInfo> comparator = new Comparator<TrainInfo>() {
+        @Override
+        public int compare(TrainInfo o1, TrainInfo o2) {
+            int ret = Boolean.compare(TrainInfo.isSellOut(o1.getZe_num()), TrainInfo.isSellOut(o2.getZe_num()));
+            if (ret != 0) return ret;
+            ret = Boolean.compare(TrainInfo.isSellOut(o1.getWz_num()), TrainInfo.isSellOut(o2.getWz_num()));
+            if (ret != 0) return ret;
+            ret = Boolean.compare(TrainInfo.isSellOut(o1.getZy_num()), TrainInfo.isSellOut(o2.getZy_num()));
+            if (ret != 0) return ret;
+            return (o1.getStart_train_date() + o1.getStart_time()).compareTo(o2.getStart_train_date() + o2.getStart_time());
         }
     };
 
@@ -123,6 +142,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         secondSeatCheck = (CheckBox) findViewById(R.id.second_seat_check);
         noSeatCheck = (CheckBox) findViewById(R.id.no_seat_check);
         exchangeButton = (Button) findViewById(R.id.exchange_button);
+
+        firstSeatCheck.setOnCheckedChangeListener(this);
+        secondSeatCheck.setOnCheckedChangeListener(this);
+        noSeatCheck.setOnCheckedChangeListener(this);
 
         queryButton.setOnClickListener(this);
         timerQueryButton.setOnClickListener(this);
@@ -351,9 +374,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                     while (calendar.getTimeInMillis() <= endDate.getTimeInMillis()) {
                         String content = Utils.queryLeftTickets( startCode, endCode,
                                 Utils.dateFormat.format(calendar.getTime()));
-                        List<TrainInfo> list = Utils.parseAvailableTrains(content,
-                                firstSeatCheck.isChecked(), secondSeatCheck.isChecked(), noSeatCheck.isChecked(),
-                                time1, time2);
+                        List<TrainInfo> list = Utils.parseAvailableTrains(content, time1, time2);
                         if (list != null)
                             data.addAll(list);
                         try {
@@ -366,7 +387,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            adapter.notifyDataSetChanged();
+                            filterTrans();
 
                             if (isInTimerQuery) {
                                 if (!data.isEmpty()) {
@@ -420,9 +441,25 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         }
     }
 
+    @Override
+    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+        filterTrans();
+    }
+
+    private void filterTrans() {
+        filteredData.clear();
+        boolean all = !firstSeatCheck.isChecked() && !secondSeatCheck.isChecked() && !noSeatCheck.isChecked();
+        for (TrainInfo info : data) {
+            if (all || info.isMatch(firstSeatCheck.isChecked(), secondSeatCheck.isChecked(), noSeatCheck.isChecked()))
+                filteredData.add(info);
+        }
+        Collections.sort(filteredData, comparator);
+        adapter.notifyDataSetChanged();
+    }
+
     private static class MyViewHolder {
 
-        TextView number, date, fromStation, toStation, starTtime, endTime, spendTime, firstSeat, secondSeat, noSeat;
+        TextView number, date, fromStation, toStation, startTime, endTime, spendTime, firstSeat, secondSeat, noSeat;
 
 
         MyViewHolder(View itemView) {
@@ -431,7 +468,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
             date = (TextView) itemView.findViewById(R.id.date);
             fromStation = (TextView) itemView.findViewById(R.id.from_station);
             toStation = (TextView) itemView.findViewById(R.id.to_station);
-            starTtime = (TextView) itemView.findViewById(R.id.start_time);
+            startTime = (TextView) itemView.findViewById(R.id.start_time);
             endTime = (TextView) itemView.findViewById(R.id.end_time);
             spendTime = (TextView) itemView.findViewById(R.id.spend_time);
             firstSeat = (TextView) itemView.findViewById(R.id.first_seat);
@@ -444,7 +481,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
             date.setText("");
             fromStation.setText("");
             toStation.setText("");
-            starTtime.setText("");
+            startTime.setText("");
             endTime.setText("");
             spendTime.setText("");
             firstSeat.setText("");
@@ -463,7 +500,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                             + info.getStart_station_name() + ")");
                 }
                 toStation.setText(info.getTo_station_name());
-                starTtime.setText(info.getStart_time());
+                startTime.setText(info.getStart_time());
                 endTime.setText(info.getArrive_time());
                 spendTime.setText(info.getLishi());
                 firstSeat.setText("一等:" + info.getZy_num());
@@ -479,12 +516,12 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
 
         @Override
         public int getCount() {
-            return data == null ? 0 : data.size();
+            return filteredData == null ? 0 : filteredData.size();
         }
 
         @Override
         public Object getItem(int position) {
-            return data.get(position);
+            return filteredData.get(position);
         }
 
         @Override
@@ -501,8 +538,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
             } else {
                 viewHolder = (MyViewHolder) convertView.getTag();
             }
-            TrainInfo info = data.get(position);
+            TrainInfo info = filteredData.get(position);
             viewHolder.setInfo(info);
+            convertView.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_OVER);
+            convertView.setEnabled(info.canBuy());
             return convertView;
         }
     }
