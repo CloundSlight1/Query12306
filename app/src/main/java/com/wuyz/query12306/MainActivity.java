@@ -74,8 +74,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     private Calendar endDate = Calendar.getInstance();
     private Calendar startTime = Calendar.getInstance();
     private Calendar endTime = Calendar.getInstance();
-    private String[] timerKeys = new String[] {"5秒", "30秒", "1分钟", "10分钟", "30分钟", "60分钟"};
-    private int[] timerValues = new int[] {5, 30, 60, 600, 1800, 3600};
+    private String[] timerKeys = new String[] {"5秒", "10秒", "30秒", "1分钟", "10分钟", "30分钟", "60分钟"};
+    private int[] timerValues = new int[] {5, 10, 30, 60, 600, 1800, 3600};
     private AlarmManager alarmManager;
     private boolean isInTimerQuery = false;
     private PendingIntent pendingIntent;
@@ -176,8 +176,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     }
 
     private void restorePrefs() {
-        startStationView.setText(preferences.getString("startStation", ""));
-        endStationView.setText(preferences.getString("endStation", ""));
+        String s = preferences.getString("startStation", "");
+        if (s.isEmpty()) s = "厦门北";
+        startStationView.setText(s);
+
+        s = preferences.getString("endStation", "");
+        if (s.isEmpty()) s = "铜陵";
+        endStationView.setText(s);
 
         int i = preferences.getInt("timer", 0);
         if (i  >= 0 && i < timerSpinner.getAdapter().getCount()) {
@@ -188,7 +193,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         secondSeatCheck.setChecked(preferences.getBoolean("secondSeat", true));
         noSeatCheck.setChecked(preferences.getBoolean("noSeat", false));
 
-        String s = preferences.getString("startDate", "");
+        s = preferences.getString("startDate", "");
         try {
             startDate.setTime(Utils.dateFormat.parse(s));
         } catch (ParseException e) {
@@ -256,6 +261,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                     Toast.makeText(this, "站点有误！", Toast.LENGTH_SHORT).show();
                     return;
                 }
+                savePrefs();
                 queryButton.setEnabled(false);
                 tryQueryTicket();
                 break;
@@ -272,6 +278,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                     Toast.makeText(this, "网络未连接，请检查！", Toast.LENGTH_SHORT).show();
                     return;
                 }
+                savePrefs();
                 isInTimerQuery = true;
                 enableViews(false);
                 tryQueryTicket();
@@ -391,9 +398,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
 
                             if (isInTimerQuery) {
                                 if (!data.isEmpty()) {
-                                    stopTimer();
-                                    notifyUser();
-                                    return;
+                                    for (TrainInfo info : data) {
+                                        if (info.isMatch(firstSeatCheck.isChecked(), secondSeatCheck.isChecked(), noSeatCheck.isChecked())) {
+                                            stopTimer();
+                                            notifyUser();
+                                            return;
+                                        }
+                                    }
                                 }
 
                                 int dealtTime = timerValues[timerSpinner.getSelectedItemPosition()] * 1000;
@@ -540,8 +551,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
             }
             TrainInfo info = filteredData.get(position);
             viewHolder.setInfo(info);
-            convertView.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_OVER);
-            convertView.setEnabled(info.canBuy());
+//            convertView.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_OVER);
+//            convertView.setEnabled(info.canBuy());
             return convertView;
         }
     }
@@ -556,9 +567,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         startTimeText.setEnabled(enable);
         endDateText.setEnabled(enable);
         endTimeText.setEnabled(enable);
-        firstSeatCheck.setEnabled(enable);
-        secondSeatCheck.setEnabled(enable);
-        noSeatCheck.setEnabled(enable);
+//        firstSeatCheck.setEnabled(enable);
+//        secondSeatCheck.setEnabled(enable);
+//        noSeatCheck.setEnabled(enable);
         exchangeButton.setEnabled(enable);
     }
 
@@ -569,14 +580,19 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     }
 
     private void notifyUser() {
-        vibrator.cancel();
-        vibrator.vibrate(new long[] {100, 200, 100, 200}, 3);
-        Notification.Builder builder = new Notification.Builder(this);
-        builder.setTicker("12306");
-        builder.setContentText("发现火车票");
-        builder.setContentTitle("发现火车票");
-        Notification notification = builder.build();
-        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        notificationManager.notify(1, notification);
+        try {
+            vibrator.cancel();
+            vibrator.vibrate(new long[]{100, 200, 100, 200}, 3);
+            Notification.Builder builder = new Notification.Builder(this);
+            builder.setTicker("12306");
+            builder.setContentText("发现火车票");
+            builder.setContentTitle("发现火车票");
+            builder.setSmallIcon(R.mipmap.ic_launcher);
+            Notification notification = builder.build();
+            NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            notificationManager.notify(1, notification);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
