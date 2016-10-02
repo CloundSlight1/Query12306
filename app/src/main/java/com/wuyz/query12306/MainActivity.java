@@ -12,8 +12,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.graphics.Color;
-import android.graphics.PorterDuff;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Vibrator;
@@ -193,12 +191,16 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         secondSeatCheck.setChecked(preferences.getBoolean("secondSeat", true));
         noSeatCheck.setChecked(preferences.getBoolean("noSeat", false));
 
+        Calendar curTime = Calendar.getInstance();
+
         s = preferences.getString("startDate", "");
         try {
             startDate.setTime(Utils.dateFormat.parse(s));
         } catch (ParseException e) {
             e.printStackTrace();
         }
+        if (startDate.before(curTime))
+            startDate = curTime;
         startDateText.setText(Utils.dateFormat.format(startDate.getTime()));
 
         s = preferences.getString("endDate", "");
@@ -207,6 +209,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         } catch (ParseException e) {
             e.printStackTrace();
         }
+        if (endDate.before(curTime))
+            endDate = curTime;
         endDateText.setText(Utils.dateFormat.format(endDate.getTime()));
 
         s = preferences.getString("startTime", "00:00");
@@ -251,96 +255,101 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
 
     @Override
     public void onClick(final View v) {
-        switch (v.getId()) {
-            case R.id.query_button:
-                if (!Utils.isNetworkConnected(this)) {
-                    Toast.makeText(this, "网络未连接，请检查！", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (!getStationCode()) {
-                    Toast.makeText(this, "站点有误！", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                savePrefs();
-                queryButton.setEnabled(false);
-                tryQueryTicket();
-                break;
-            case R.id.timer_query_button:
-                if (isInTimerQuery) {
-                    stopTimer();
-                    return;
-                }
-                if (!getStationCode()) {
-                    Toast.makeText(this, "站点有误！", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (!Utils.isNetworkConnected(this)) {
-                    Toast.makeText(this, "网络未连接，请检查！", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                savePrefs();
-                isInTimerQuery = true;
-                enableViews(false);
-                tryQueryTicket();
-                break;
-            case R.id.start_date_view:
-                DatePickerDialog dialog = new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
-                    @Override
-                    public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
-                        startDate.set(Calendar.YEAR, year);
-                        startDate.set(Calendar.MONTH, month);
-                        startDate.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-                        startDate.set(Calendar.HOUR_OF_DAY, 0);
-                        startDate.set(Calendar.MINUTE, 0);
-                        startDateText.setText(Utils.dateFormat.format(startDate.getTime()));
+        try {
+            switch (v.getId()) {
+                case R.id.query_button:
+                    if (!Utils.isNetworkConnected(this)) {
+                        Toast.makeText(this, "网络未连接，请检查！", Toast.LENGTH_SHORT).show();
+                        return;
                     }
-                }, startDate.get(Calendar.YEAR), startDate.get(Calendar.MONTH), startDate.get(Calendar.DAY_OF_MONTH));
-                dialog.getDatePicker().setMinDate(System.currentTimeMillis() - 24 * 3600000L);
-                dialog.show();
-                break;
-            case R.id.end_date_view:
-                dialog = new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
-                    @Override
-                    public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
-                        endDate.set(Calendar.YEAR, year);
-                        endDate.set(Calendar.MONTH, month);
-                        endDate.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-                        endDate.set(Calendar.HOUR_OF_DAY, 23);
-                        endDate.set(Calendar.MINUTE, 59);
-                        endDateText.setText(Utils.dateFormat.format(endDate.getTime()));
+                    if (!getStationCode()) {
+                        Toast.makeText(this, "站点有误！", Toast.LENGTH_SHORT).show();
+                        return;
                     }
-                }, endDate.get(Calendar.YEAR), endDate.get(Calendar.MONTH), endDate.get(Calendar.DAY_OF_MONTH));
-                dialog.getDatePicker().setMinDate(System.currentTimeMillis() - 24 * 3600000L);
-                dialog.show();
-                break;
-            case R.id.start_time_view:
-                TimePickerDialog dialog2 = new TimePickerDialog(this, new TimePickerDialog.OnTimeSetListener() {
-                    @Override
-                    public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
-                        startTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
-                        startTime.set(Calendar.MINUTE, minute);
-                        startTimeText.setText(Utils.timeFormat.format(startTime.getTime()));
+                    savePrefs();
+                    queryButton.setEnabled(false);
+                    tryQueryTicket();
+                    break;
+                case R.id.timer_query_button:
+                    if (isInTimerQuery) {
+                        stopTimer();
+                        return;
                     }
-                }, startTime.get(Calendar.HOUR_OF_DAY), startTime.get(Calendar.MINUTE), true);
-                dialog2.show();
-                break;
-            case R.id.end_time_view:
-                dialog2 = new TimePickerDialog(this, new TimePickerDialog.OnTimeSetListener() {
-                    @Override
-                    public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
-                        endTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
-                        endTime.set(Calendar.MINUTE, minute);
-                        endTimeText.setText(Utils.timeFormat.format(endTime.getTime()));
+                    if (!getStationCode()) {
+                        Toast.makeText(this, "站点有误！", Toast.LENGTH_SHORT).show();
+                        return;
                     }
-                }, endTime.get(Calendar.HOUR_OF_DAY), endTime.get(Calendar.MINUTE), true);
-                dialog2.show();
-                break;
-            case R.id.exchange_button:
-                String s1 = startStationView.getText().toString();
-                String s2 = endStationView.getText().toString();
-                startStationView.setText(s2);
-                endStationView.setText(s1);
-                break;
+                    if (!Utils.isNetworkConnected(this)) {
+                        Toast.makeText(this, "网络未连接，请检查！", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    savePrefs();
+                    isInTimerQuery = true;
+                    enableViews(false);
+                    tryQueryTicket();
+                    break;
+                case R.id.start_date_view:
+                    DatePickerDialog dialog = new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
+                        @Override
+                        public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
+                            startDate.set(Calendar.YEAR, year);
+                            startDate.set(Calendar.MONTH, month);
+                            startDate.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                            startDate.set(Calendar.HOUR_OF_DAY, 0);
+                            startDate.set(Calendar.MINUTE, 0);
+                            startDateText.setText(Utils.dateFormat.format(startDate.getTime()));
+                        }
+                    }, startDate.get(Calendar.YEAR), startDate.get(Calendar.MONTH), startDate.get(Calendar.DAY_OF_MONTH));
+//                    dialog.getDatePicker().setMinDate(System.currentTimeMillis());
+                    dialog.show();
+                    break;
+                case R.id.end_date_view:
+                    dialog = new DatePickerDialog(this, new DatePickerDialog.OnDateSetListener() {
+                        @Override
+                        public void onDateSet(DatePicker view, int year, int month, int dayOfMonth) {
+                            endDate.set(Calendar.YEAR, year);
+                            endDate.set(Calendar.MONTH, month);
+                            endDate.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                            endDate.set(Calendar.HOUR_OF_DAY, 23);
+                            endDate.set(Calendar.MINUTE, 59);
+                            endDateText.setText(Utils.dateFormat.format(endDate.getTime()));
+                        }
+                    }, endDate.get(Calendar.YEAR), endDate.get(Calendar.MONTH), endDate.get(Calendar.DAY_OF_MONTH));
+//                    dialog.getDatePicker().setMinDate(System.currentTimeMillis());
+                    dialog.show();
+                    break;
+                case R.id.start_time_view:
+                    TimePickerDialog dialog2 = new TimePickerDialog(this, new TimePickerDialog.OnTimeSetListener() {
+                        @Override
+                        public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
+                            startTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                            startTime.set(Calendar.MINUTE, minute);
+                            startTimeText.setText(Utils.timeFormat.format(startTime.getTime()));
+                        }
+                    }, startTime.get(Calendar.HOUR_OF_DAY), startTime.get(Calendar.MINUTE), true);
+                    dialog2.show();
+                    break;
+                case R.id.end_time_view:
+                    dialog2 = new TimePickerDialog(this, new TimePickerDialog.OnTimeSetListener() {
+                        @Override
+                        public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
+                            endTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                            endTime.set(Calendar.MINUTE, minute);
+                            endTimeText.setText(Utils.timeFormat.format(endTime.getTime()));
+                        }
+                    }, endTime.get(Calendar.HOUR_OF_DAY), endTime.get(Calendar.MINUTE), true);
+                    dialog2.show();
+                    break;
+                case R.id.exchange_button:
+                    String s1 = startStationView.getText().toString();
+                    String s2 = endStationView.getText().toString();
+                    startStationView.setText(s2);
+                    endStationView.setText(s1);
+                    break;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -580,19 +589,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     }
 
     private void notifyUser() {
-        try {
-            vibrator.cancel();
-            vibrator.vibrate(new long[]{100, 200, 100, 200}, 3);
-            Notification.Builder builder = new Notification.Builder(this);
-            builder.setTicker("12306");
-            builder.setContentText("发现火车票");
-            builder.setContentTitle("发现火车票");
-            builder.setSmallIcon(R.mipmap.ic_launcher);
-            Notification notification = builder.build();
-            NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            notificationManager.notify(1, notification);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        vibrator.cancel();
+        vibrator.vibrate(new long[]{100, 200, 100, 200}, 3);
+        Notification.Builder builder = new Notification.Builder(this);
+        builder.setTicker("12306");
+        builder.setContentText("发现火车票");
+        builder.setContentTitle("发现火车票");
+        builder.setSmallIcon(R.mipmap.ic_launcher);
+        Notification notification = builder.build();
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        notificationManager.notify(1, notification);
     }
 }
