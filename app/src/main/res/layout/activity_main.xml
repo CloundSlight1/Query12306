@@ -141,4 +141,12 @@
         android:padding="2dp"
         android:layout_marginTop="16dp"
         android:dividerHeight="2dp"/>
+    <Button
+        android:id="@+id/error_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="errors"
+        android:layout_toEndOf="@id/no_seat_check"
+        android:layout_alignBaseline="@id/no_seat_check"
+        android:layout_marginStart="16dp"/>
 </RelativeLayout>

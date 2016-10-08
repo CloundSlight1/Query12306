@@ -34,7 +34,7 @@ import javax.net.ssl.X509TrustManager;
 public class Utils {
     private static final String TAG = "Utils";
 
-    public static SimpleDateFormat dateLongFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+    public static SimpleDateFormat dateLongFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
     public static SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     public static SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
@@ -106,8 +106,8 @@ public class Utils {
                     "purpose_codes=ADULT", date, fromStationCode, toStationCode);
             URL url = new URL("https://kyfw.12306.cn/otn/leftTicket/queryT?" + param);
             connection = (HttpsURLConnection) url.openConnection();
-            connection.setConnectTimeout(15000);
-            connection.setReadTimeout(20000);
+            connection.setConnectTimeout(8000);
+            connection.setReadTimeout(10000);
 //            connection.setRequestMethod("POST");
 //            connection.setDoOutput(true);
             connection.setRequestProperty("Host", "kyfw.12306.cn");
