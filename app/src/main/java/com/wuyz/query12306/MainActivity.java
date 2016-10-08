@@ -200,7 +200,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
             e.printStackTrace();
         }
         if (startDate.before(curTime))
-            startDate = curTime;
+            startDate.setTimeInMillis(curTime.getTimeInMillis());
         startDateText.setText(Utils.dateFormat.format(startDate.getTime()));
 
         s = preferences.getString("endDate", "");
@@ -210,7 +210,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
             e.printStackTrace();
         }
         if (endDate.before(curTime))
-            endDate = curTime;
+            endDate.setTimeInMillis(curTime.getTimeInMillis());
         endDateText.setText(Utils.dateFormat.format(endDate.getTime()));
 
         s = preferences.getString("startTime", "00:00");
@@ -374,6 +374,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     }
 
     private void tryQueryTicket() {
+        startDate.set(Calendar.HOUR_OF_DAY, 0);
+        startDate.set(Calendar.MINUTE, 0);
+        endDate.set(Calendar.HOUR_OF_DAY, 23);
+        endDate.set(Calendar.MINUTE, 59);
         final String time1 = Utils.timeFormat.format(startTime.getTime());
         final String time2 = Utils.timeFormat.format(endTime.getTime());
         Log2.d(TAG, "tryQueryTicket %s - %s, %s - %s",
