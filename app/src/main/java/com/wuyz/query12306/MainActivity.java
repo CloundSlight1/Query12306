@@ -13,8 +13,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.graphics.PorterDuff;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
@@ -38,6 +39,7 @@ import android.widget.Toast;
 import com.wuyz.query12306.model.TrainInfo;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
 import java.text.ParseException;
@@ -73,15 +75,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     private List<TrainInfo> data = new ArrayList<>();
     private List<TrainInfo> filteredData = new ArrayList<>();
     private Map<String, String> stationMap;
-//    private List<StationInfo> stations;
+    //    private List<StationInfo> stations;
     private MyAdapter adapter;
     private SharedPreferences preferences;
     private Calendar startDate = Calendar.getInstance();
     private Calendar endDate = Calendar.getInstance();
     private Calendar startTime = Calendar.getInstance();
     private Calendar endTime = Calendar.getInstance();
-    private String[] timerKeys = new String[] {"5秒", "10秒", "30秒", "1分钟", "10分钟", "30分钟", "60分钟"};
-    private int[] timerValues = new int[] {5, 10, 30, 60, 600, 1800, 3600};
+    private String[] timerKeys = new String[]{"5秒", "10秒", "30秒", "1分钟", "10分钟", "30分钟", "60分钟"};
+    private int[] timerValues = new int[]{5, 10, 30, 60, 600, 1800, 3600};
     private AlarmManager alarmManager;
     private boolean isInTimerQuery = false;
     private PendingIntent pendingIntent;
@@ -160,6 +162,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         startTimeText.setOnClickListener(this);
         endTimeText.setOnClickListener(this);
         exchangeButton.setOnClickListener(this);
+        findViewById(R.id.error_button).setOnClickListener(this);
 
         ListView listView = (ListView) findViewById(R.id.list1);
         adapter = new MyAdapter();
@@ -191,7 +194,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         endStationView.setText(s);
 
         int i = preferences.getInt("timer", 0);
-        if (i  >= 0 && i < timerSpinner.getAdapter().getCount()) {
+        if (i >= 0 && i < timerSpinner.getAdapter().getCount()) {
             timerSpinner.setSelection(i);
         }
 
@@ -199,12 +202,16 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         secondSeatCheck.setChecked(preferences.getBoolean("secondSeat", true));
         noSeatCheck.setChecked(preferences.getBoolean("noSeat", false));
 
+        Calendar curTime = Calendar.getInstance();
+
         s = preferences.getString("startDate", "");
         try {
             startDate.setTime(Utils.dateFormat.parse(s));
         } catch (ParseException e) {
             e.printStackTrace();
         }
+        if (startDate.before(curTime))
+            startDate.setTimeInMillis(curTime.getTimeInMillis());
         startDateText.setText(Utils.dateFormat.format(startDate.getTime()));
 
         s = preferences.getString("endDate", "");
@@ -213,6 +220,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         } catch (ParseException e) {
             e.printStackTrace();
         }
+        if (endDate.before(curTime))
+            endDate.setTimeInMillis(curTime.getTimeInMillis());
         endDateText.setText(Utils.dateFormat.format(endDate.getTime()));
 
         s = preferences.getString("startTime", "00:00");
@@ -301,7 +310,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                         startDateText.setText(Utils.dateFormat.format(startDate.getTime()));
                     }
                 }, startDate.get(Calendar.YEAR), startDate.get(Calendar.MONTH), startDate.get(Calendar.DAY_OF_MONTH));
-                dialog.getDatePicker().setMinDate(System.currentTimeMillis() - 24 * 3600000L);
+                dialog.getDatePicker().setMinDate(Math.min(startDate.getTimeInMillis(), System.currentTimeMillis()) - 1000);
                 dialog.show();
                 break;
             case R.id.end_date_view:
@@ -316,7 +325,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                         endDateText.setText(Utils.dateFormat.format(endDate.getTime()));
                     }
                 }, endDate.get(Calendar.YEAR), endDate.get(Calendar.MONTH), endDate.get(Calendar.DAY_OF_MONTH));
-                dialog.getDatePicker().setMinDate(System.currentTimeMillis() - 24 * 3600000L);
+                dialog.getDatePicker().setMinDate(Math.min(endDate.getTimeInMillis(), System.currentTimeMillis()) - 1000);
                 dialog.show();
                 break;
             case R.id.start_time_view:
@@ -347,6 +356,16 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                 startStationView.setText(s2);
                 endStationView.setText(s1);
                 break;
+            case R.id.error_button:
+                File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "error.txt");
+                if (file.exists() && file.isFile()) {
+                    Intent intent = new Intent(this, MessageActivity.class);
+                    intent.setData(Uri.fromFile(file));
+                    startActivity(intent);
+                } else {
+                    Toast.makeText(this, "no error log", Toast.LENGTH_SHORT).show();
+                }
+                break;
         }
     }
 
@@ -371,6 +390,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     }
 
     private void tryQueryTicket() {
+        startDate.set(Calendar.HOUR_OF_DAY, 0);
+        startDate.set(Calendar.MINUTE, 0);
+        endDate.set(Calendar.HOUR_OF_DAY, 23);
+        endDate.set(Calendar.MINUTE, 59);
         final String time1 = Utils.timeFormat.format(startTime.getTime());
         final String time2 = Utils.timeFormat.format(endTime.getTime());
         Log2.d(TAG, "tryQueryTicket %s - %s, %s - %s",
@@ -385,7 +408,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                 if (Utils.isNetworkConnected(MainActivity.this)) {
                     Calendar calendar = (Calendar) startDate.clone();
                     while (calendar.getTimeInMillis() <= endDate.getTimeInMillis()) {
-                        String content = queryLeftTickets( startCode, endCode,
+                        String content = queryLeftTickets(startCode, endCode,
                                 Utils.dateFormat.format(calendar.getTime()));
                         List<TrainInfo> list = Utils.parseAvailableTrains(content, time1, time2);
                         if (list != null)
@@ -477,6 +500,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     private static class MyViewHolder {
 
         TextView number, date, fromStation, toStation, startTime, endTime, spendTime, firstSeat, secondSeat, noSeat;
+//        View mask;
 
 
         MyViewHolder(View itemView) {
@@ -491,6 +515,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
             firstSeat = (TextView) itemView.findViewById(R.id.first_seat);
             secondSeat = (TextView) itemView.findViewById(R.id.second_seat);
             noSeat = (TextView) itemView.findViewById(R.id.no_seat);
+//            mask = itemView.findViewById(R.id.mask);
         }
 
         void clear() {
@@ -504,6 +529,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
             firstSeat.setText("");
             secondSeat.setText("");
             noSeat.setText("");
+//            mask.setVisibility(View.VISIBLE);
         }
 
         void setInfo(TrainInfo info) {
@@ -523,6 +549,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                 firstSeat.setText("一等:" + info.getZy_num());
                 secondSeat.setText("二等:" + info.getZe_num());
                 noSeat.setText("无座:" + info.getWz_num());
+                // mask.setVisibility(info.canBuy() ? View.GONE : View.VISIBLE);
             } else {
                 clear();
             }
@@ -557,8 +584,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
             }
             TrainInfo info = filteredData.get(position);
             viewHolder.setInfo(info);
-//            convertView.getBackground().setColorFilter(Color.GRAY, PorterDuff.Mode.SRC_OVER);
-//            convertView.setEnabled(info.canBuy());
+            convertView.setBackgroundColor(info.canBuy() ? Color.WHITE : Color.LTGRAY);
             return convertView;
         }
     }
@@ -586,20 +612,16 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
     }
 
     private void notifyUser() {
-        try {
-            vibrator.cancel();
-            vibrator.vibrate(new long[]{100, 200, 100, 200}, 3);
-            Notification.Builder builder = new Notification.Builder(this);
-            builder.setTicker("12306");
-            builder.setContentText("发现火车票");
-            builder.setContentTitle("发现火车票");
-            builder.setSmallIcon(R.mipmap.ic_launcher);
-            Notification notification = builder.build();
-            NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            notificationManager.notify(1, notification);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        vibrator.cancel();
+        vibrator.vibrate(new long[]{100, 200, 100, 200}, 3);
+        Notification.Builder builder = new Notification.Builder(this);
+        builder.setTicker("12306");
+        builder.setContentText("发现火车票");
+        builder.setContentTitle("发现火车票");
+        builder.setSmallIcon(R.mipmap.ic_launcher);
+        Notification notification = builder.build();
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        notificationManager.notify(1, notification);
     }
 
     //queryLeftTickets("XKS", "ARH", "2016-10-01");

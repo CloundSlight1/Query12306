@@ -34,7 +34,7 @@ import javax.net.ssl.X509TrustManager;
 public class Utils {
     private static final String TAG = "Utils";
 
-    public static SimpleDateFormat dateLongFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+    public static SimpleDateFormat dateLongFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
     public static SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     public static SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
