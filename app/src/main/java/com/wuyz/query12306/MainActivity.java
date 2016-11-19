@@ -37,6 +37,9 @@ import android.widget.Toast;
 
 import com.wuyz.query12306.model.TrainInfo;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.URL;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -45,6 +48,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
+
+import javax.net.ssl.HttpsURLConnection;
 
 public class MainActivity extends Activity implements View.OnClickListener, TextToSpeech.OnInitListener, CompoundButton.OnCheckedChangeListener {
     private static final String TAG = "MainActivity";
@@ -379,7 +385,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
                 if (Utils.isNetworkConnected(MainActivity.this)) {
                     Calendar calendar = (Calendar) startDate.clone();
                     while (calendar.getTimeInMillis() <= endDate.getTimeInMillis()) {
-                        String content = Utils.queryLeftTickets( startCode, endCode,
+                        String content = queryLeftTickets( startCode, endCode,
                                 Utils.dateFormat.format(calendar.getTime()));
                         List<TrainInfo> list = Utils.parseAvailableTrains(content, time1, time2);
                         if (list != null)
@@ -594,5 +600,87 @@ public class MainActivity extends Activity implements View.OnClickListener, Text
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    //queryLeftTickets("XKS", "ARH", "2016-10-01");
+    public String queryLeftTickets(String fromStationCode, String toStationCode, String date) {
+        Log2.d(TAG, "queryLeftTickets %s %s %s", fromStationCode, toStationCode, date);
+        HttpsURLConnection connection = null;
+        try {
+            String param = String.format("leftTicketDTO.train_date=%s" +
+                    "&leftTicketDTO.from_station=%s&" +
+                    "leftTicketDTO.to_station=%s&" +
+                    "purpose_codes=ADULT", date, fromStationCode, toStationCode);
+            URL url = new URL("https://kyfw.12306.cn/otn/leftTicket/queryT?" + param);
+            connection = (HttpsURLConnection) url.openConnection();
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(20000);
+//            connection.setRequestMethod("POST");
+//            connection.setDoOutput(true);
+            connection.setRequestProperty("Host", "kyfw.12306.cn");
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 5.1; rv:34.0) Gecko/20100101 Firefox/34.0");
+            connection.setRequestProperty("Accept", "*/*");
+            connection.setRequestProperty("Accept-Language", "zh-cn,zh;q=0.8,en-us;q=0.5,en;q=0.3");
+            connection.setRequestProperty("Accept-Encoding", "gzip, deflate");
+            //connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+            connection.setRequestProperty("If-Modified-Since", "0");
+            connection.setRequestProperty("Cache-Control", "no-cache");
+            connection.setRequestProperty("X-Requested-With", "XMLHttpRequest");
+            connection.setRequestProperty("Referer", "https://kyfw.12306.cn/");
+            connection.setRequestProperty("Cookie", "tmp");
+            connection.setRequestProperty("Connection", "keep-alive");
+
+//            OutputStream outputStream = connection.getOutputStream();
+//            outputStream.write(param.getBytes());
+
+            final int code = connection.getResponseCode();
+            Log2.d(TAG, "getResponseCode %d", code);
+            if (code != HttpsURLConnection.HTTP_OK) {
+                Map<String, List<String>> headers = connection.getHeaderFields();
+                if (headers != null) {
+                    StringBuilder builder = new StringBuilder();
+                    for (String key : headers.keySet()) {
+                        builder.append(key).append(':');
+                        for (String v : headers.get(key)) {
+                            builder.append(v).append(',');
+                        }
+                        builder.append('\n');
+                    }
+                    Log2.d(TAG, "headers\n%s", builder);
+                }
+
+                final String msg = connection.getResponseMessage();
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, code + ":" + msg, Toast.LENGTH_SHORT).show();
+                    }
+                });
+                return "";
+            }
+
+            boolean isZip = "gzip".equals(connection.getHeaderField("Content-Encoding"));
+            InputStream inputStream;
+            if (isZip) {
+                inputStream = new GZIPInputStream(connection.getInputStream());
+            } else {
+                inputStream = connection.getInputStream();
+            }
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
+            byte[] buffer = new byte[1024];
+            int n;
+            while ((n = inputStream.read(buffer)) != -1) {
+                byteArrayOutputStream.write(buffer, 0, n);
+            }
+            String content = byteArrayOutputStream.toString();
+            Log2.d(TAG, "ret: %s", content);
+            return content;
+        } catch (Exception e) {
+            Log2.e(TAG, e);
+        } finally {
+            if (connection != null)
+                connection.disconnect();
+        }
+        return null;
     }
 }
